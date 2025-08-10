@@ -19,7 +19,6 @@
     async function downloadAllImages(e) {
         e.stopPropagation();
         e.preventDefault();
-        // Only run on /artworks/{ID} page
         const match = window.location.pathname.match(/^\/artworks\/(\d+)$/);
         if (!match) {
             alert('Download only works on artwork detail pages.');
@@ -27,44 +26,42 @@
         }
         const artworkId = match[1];
         try {
-            // Fetch artwork JSON
             const resp = await fetch(`https://www.pixiv.net/ajax/illust/${artworkId}`);
             if (!resp.ok) throw new Error('Failed to fetch artwork info');
             const data = await resp.json();
             const urls = data.body && data.body.urls;
             if (!urls) throw new Error('No image URLs found');
-            // Determine quality
             let quality = pixivDownloaderSettings.quality || 'original';
             let imageUrl = urls[quality] || urls['original'];
-            if (!imageUrl) throw new Error('No image URL for selected quality');
-            // 用 XMLHttpRequest GET 圖片內容
             const filename = `${artworkId}_${quality}.jpg`;
-            const savePath = pixivDownloaderSettings.savePath ? `${pixivDownloaderSettings.savePath.replace(/\\/g, '/')}/${filename}` : filename;
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', imageUrl, true);
-            xhr.responseType = 'blob';
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    var blob = xhr.response;
-                    var objectUrl = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
-                    a.href = objectUrl;
-                    a.download = savePath;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(function() {
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(objectUrl);
-                    }, 100);
-                    alert('Download started!');
-                } else {
-                    alert('Image request failed: ' + xhr.status);
-                }
-            };
-            xhr.onerror = function() {
-                alert('XMLHttpRequest error');
-            };
-            xhr.send();
+            // 直接 fetch 圖片 blob
+            fetch(imageUrl, {
+                headers: {
+                    'Referer': 'https://www.pixiv.net'
+                },
+                credentials: 'omit'
+            })
+            .then(resp => {
+                if (!resp.ok) throw new Error('Failed to fetch image');
+                return resp.blob();
+            })
+            .then(blob => {
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    URL.revokeObjectURL(blobUrl);
+                    document.body.removeChild(a);
+                }, 10000);
+                alert('Download started!');
+            })
+            .catch(err => {
+                alert('Download failed: ' + err.message);
+            });
         } catch (err) {
             alert('Error: ' + err.message);
         }
@@ -72,7 +69,6 @@
 
     function insertDownloadButton() {
         const targets = document.querySelectorAll('div.eLoxRg');
-		console.log("Insert targets: ", targets);
         targets.forEach(el => {
             // Find the <a> parent
             let aTag = el.closest('a');
@@ -101,13 +97,10 @@
             btn.onclick = downloadAllImages;
             if (likeBtn && likeBtn.nextSibling) {
                 siblingDiv.insertBefore(btn, likeBtn.nextSibling);
-                console.log('[Pixiv Downloader] Download button added next to like button:', likeBtn);
             } else if (likeBtn) {
                 siblingDiv.appendChild(btn);
-                console.log('[Pixiv Downloader] Download button added next to like button:', likeBtn);
             } else {
                 siblingDiv.appendChild(btn);
-                console.log('[Pixiv Downloader] Download button added (no like button found) in:', siblingDiv);
             }
         });
     }
@@ -135,7 +128,6 @@
             container.appendChild(btn);
             // Insert container before parentDiv
             parentDiv.parentElement.insertBefore(container, parentDiv);
-            console.log('[Pixiv Downloader] Download button added above gtm-main-bookmark button:', bookmarkBtn);
         });
     }
 

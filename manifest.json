@@ -26,9 +26,6 @@
 			"512": "images/pixiv-downloader-icon-512.png"
 		}
 	},
-	"background": {
-		"service_worker": "background.js"
-	},
 	"content_scripts": [
 		{
 			"matches": [
