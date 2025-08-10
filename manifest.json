@@ -3,10 +3,13 @@
 	"name": "Pixiv Downloader",
 	"version": "1.0",
 	"description": "Download images from Pixiv",
+   	"host_permissions": [ "*://*/*" ],
 	"permissions": [
 		"storage",
 		"downloads",
 		"unlimitedStorage",
+		"webRequest",
+		"declarativeNetRequest",
 		"notifications"
 	],
 	"icons": {
@@ -25,6 +28,16 @@
 			"256": "images/pixiv-downloader-icon-256.png",
 			"512": "images/pixiv-downloader-icon-512.png"
 		}
+	},
+	"declarative_net_request": {
+		"rule_resources": [ {
+			"enabled": true,
+			"id": "referer-pixiv",
+			"path": "rule.json"
+		} ]
+	},
+	"background": {
+		"service_worker": "background.js"
 	},
 	"content_scripts": [
 		{

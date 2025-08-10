@@ -1,40 +1,36 @@
-
 // background.js for Pixiv Downloader
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'downloadImage') {
-        // 用 XMLHttpRequest 嘗試 GET 圖片內容
-        try {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', message.imageUrl, true);
-            xhr.responseType = 'blob';
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    var blob = xhr.response;
-                    var objectUrl = URL.createObjectURL(blob);
-                    chrome.downloads.download({
-                        url: objectUrl,
-                        filename: message.filename,
-                        saveAs: false
-                    }, function(downloadId) {
-                        URL.revokeObjectURL(objectUrl);
-                        if (chrome.runtime.lastError) {
-                            sendResponse({ success: false, error: chrome.runtime.lastError.message });
-                        } else {
-                            sendResponse({ success: true });
-                        }
-                    });
-                } else {
-                    sendResponse({ success: false, error: 'Image request failed: ' + xhr.status });
-                }
+    if (message.action === 'pixiv-download') {
+        fetch(message.imageUrl)
+        .then(resp => {
+            if (!resp.ok) throw new Error('Failed to fetch image');
+            return resp.blob();
+        })
+        .then(blob => {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                // 主動回傳結果給 content.js
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    success: true,
+                    dataUrl: reader.result,
+                    filename: message.filename
+                });
             };
-            xhr.onerror = function() {
-                sendResponse({ success: false, error: 'XMLHttpRequest error' });
+            reader.onerror = function() {
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    success: false,
+                    error: 'Failed to read blob'
+                });
             };
-            xhr.send();
-        } catch (err) {
-            sendResponse({ success: false, error: err.message });
-        }
-        // Indicate async response
-        return true;
+            reader.readAsDataURL(blob);
+        })
+        .catch(err => {
+            chrome.tabs.sendMessage(sender.tab.id, {
+                success: false,
+                error: err.message
+            });
+        });
+        // 不再用 sendResponse，直接 return
+        return;
     }
 });

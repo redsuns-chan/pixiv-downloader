@@ -1,5 +1,24 @@
 // Content script for Pixiv Downloader
 (function() {
+    // 監聽 background.js 主動回傳的下載結果
+    chrome.runtime.onMessage.addListener(function(response, sender, sendResponse) {
+		console.log(response);
+        if (response && response.success && response.dataUrl && response.filename) {
+            const a = document.createElement('a');
+            a.href = response.dataUrl;
+            a.download = response.filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+            }, 1000);
+            alert('Download started!');
+        } else if (response && response.error) {
+			console.error('Download failed:', JSON.stringify(response, null, 2));
+            alert('Download failed: ' + response.error);
+        }
+    });
     if (window.location.hostname !== "www.pixiv.net") return;
 
     // Settings storage
@@ -34,33 +53,11 @@
             let quality = pixivDownloaderSettings.quality || 'original';
             let imageUrl = urls[quality] || urls['original'];
             const filename = `${artworkId}_${quality}.jpg`;
-            // 直接 fetch 圖片 blob
-            fetch(imageUrl, {
-                headers: {
-                    'Referer': 'https://www.pixiv.net'
-                },
-                credentials: 'omit'
-            })
-            .then(resp => {
-                if (!resp.ok) throw new Error('Failed to fetch image');
-                return resp.blob();
-            })
-            .then(blob => {
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = blobUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    URL.revokeObjectURL(blobUrl);
-                    document.body.removeChild(a);
-                }, 10000);
-                alert('Download started!');
-            })
-            .catch(err => {
-                alert('Download failed: ' + err.message);
+            // 發訊息給 background.js 下載
+            chrome.runtime.sendMessage({
+                action: 'pixiv-download',
+                imageUrl,
+                filename
             });
         } catch (err) {
             alert('Error: ' + err.message);
